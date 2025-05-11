@@ -1,306 +1,240 @@
-"use client";
+'use client';
 
-import { usePathname } from "next/navigation";
-import { useState, useRef, useEffect, useCallback } from "react";
-import { motion } from "framer-motion";
+import { useState, useEffect, useRef } from "react";
+import { UserCircle, Trophy, Clock, RotateCw } from "lucide-react";
 
-// Simple avatar component
-const Avatar = ({ name, active = false }: any) => {
-    const colors = ["bg-blue-500", "bg-green-500", "bg-purple-500", "bg-yellow-500", "bg-pink-500"];
-    const randomColor = colors[name.length % colors.length];
-
-    return (
-        <div className={`relative flex items-center space-x-2 ${active ? "opacity-100" : "opacity-60"}`}>
-            <div className={`${randomColor} h-8 w-8 rounded-full flex items-center justify-center text-white font-bold`}>
-                {name.charAt(0).toUpperCase()}
-            </div>
-            <span className="text-sm font-medium">{name}</span>
-            {active && (
-                <span className="absolute -right-2 -top-1 h-3 w-3 bg-green-500 rounded-full border-2 border-white"></span>
-            )}
-        </div>
-    );
-};
-
-// Main component
-const TypeGame = () => {
-    const code = usePathname().split("/")[2] || "ABC123";
-    const containerRef = useRef<any>(null);
-    const startTimeRef = useRef<any>(null);
-
-    // Game state
-    const [targetText, setTargetText] = useState("the quick brown fox jumps over the lazy dog");
-    const [typedText, setTypedText] = useState("");
-    const [cursorPosition, setCursorPosition] = useState(0);
-    const [isBlinking, setIsBlinking] = useState(true);
-    const [status, setStatus] = useState("waiting");
-
-    // Stats
+const CodeSubPage = () => {
+    const [index, setIndex] = useState(0);
+    const [inputValue, setInputValue] = useState('');
+    const [visibleInputValue, setVisibleInputValue] = useState(''); // New state for displaying input
+    const [currentStringIndex, setCurrentStringIndex] = useState(0);
+    const [startTime, setStartTime] = useState(null);
     const [wpm, setWpm] = useState(0);
+    const [isComplete, setIsComplete] = useState(false);
     const [accuracy, setAccuracy] = useState(100);
-    const [elapsedTime, setElapsedTime] = useState(0);
+    const [mistakes, setMistakes] = useState(0);
+    const inputRef = useRef<any>(null);
+    const [userName, setUserName] = useState('Speed Typer'); // Added user name state
+    const [userColor, setUserColor] = useState('#4F46E5'); // Added user color state for profile
 
-    // Add mock participant (just you)
-    const [participants] = useState([
-        { id: "you", name: "You", active: true }
-    ]);
+    const strings = ['asdf; jkl; gh; as": saf adfas;', 'e13431234312'];
+    const currentString = strings[currentStringIndex];
 
-    // Timer for WPM calculation
-    const [timerActive, setTimerActive] = useState(false);
-
-    // Reset game
-    const resetGame = useCallback(() => {
-        setTypedText("");
-        setCursorPosition(0);
-        setStatus("waiting");
-        setWpm(0);
-        setElapsedTime(0);
-        setTimerActive(false);
-        startTimeRef.current = null;
-    }, []);
-
-    // Initialize game on mount
+    // Start timer on first keypress
     useEffect(() => {
-        resetGame();
-
-        // Focus on the container
-        if (containerRef.current) {
-            containerRef.current.focus();
+        if (index === 1 && !startTime) {
+            setStartTime(Date.now() as any);
         }
-    }, [resetGame]);
+    }, [index, startTime]);
 
-    // Handle cursor blinking effect
+    // Calculate WPM
     useEffect(() => {
-        const blinkInterval = setInterval(() => {
-            setIsBlinking(prev => !prev);
-        }, 530);
-        return () => clearInterval(blinkInterval);
-    }, []);
+        if (startTime && index > 0) {
+            const timeElapsed = (Date.now() - startTime) / 1000 / 60; // in minutes
+            const wordsTyped = index / 5; // Standard: 5 characters = 1 word
+            const currentWpm = Math.round(wordsTyped / timeElapsed);
+            setWpm(currentWpm);
+        }
+    }, [index, startTime]);
 
-    // Handle timer for WPM calculation
+    // Handle string completion
     useEffect(() => {
-        let interval = null;
-
-        if (timerActive) {
-            interval = setInterval(() => {
-                const now = Date.now();
-                if (startTimeRef.current) {
-                    const elapsed = (now - startTimeRef.current) / 1000; // Convert to seconds
-                    setElapsedTime(elapsed);
-
-                    // Calculate WPM: (characters typed / 5) / (minutes elapsed)
-                    if (elapsed > 0) {
-                        const minutes = elapsed / 60;
-                        const wordsTyped = typedText.length / 5;
-                        const currentWpm = Math.round(wordsTyped / minutes);
-                        setWpm(currentWpm);
-                    }
-                }
+        if (index === currentString.length) {
+            // Focus the input field for the next string
+            setTimeout(() => {
+                if (inputRef.current) inputRef.current.focus();
             }, 100);
-        }
 
-        return () => clearInterval(interval as any);
-    }, [timerActive, typedText.length]);
-
-    // Handle keydown events
-    const handleKeyDown = (e: any) => {
-        // Prevent default for spacebar
-        if (e.key === " ") e.preventDefault();
-
-        // Start timer on first keystroke
-        if (status === "waiting") {
-            setStatus("typing");
-            setTimerActive(true);
-            startTimeRef.current = Date.now();
-        }
-
-        if (status === "completed") return;
-
-        if (e.key === "Backspace") {
-            // Handle backspace
-            if (typedText.length > 0) {
-                setTypedText(prev => prev.slice(0, -1));
-                setCursorPosition(prev => Math.max(0, prev - 1));
+            // If completed all strings
+            if (currentStringIndex === strings.length - 1) {
+                setIsComplete(true);
+            } else {
+                // Move to next string
+                setCurrentStringIndex(currentStringIndex + 1);
             }
+
+            // Reset for next string
+            setIndex(0);
+            setInputValue('');
+            setVisibleInputValue('');
+        }
+    }, [index, currentString.length, currentStringIndex, strings.length]);
+
+    const handleChange = (e: any) => {
+        const value = e.target.value;
+
+        // Show the value briefly
+        setVisibleInputValue(value);
+
+        // If backspace was pressed
+        if (value.length < inputValue.length) {
+            if (index > 0) {
+                setIndex(index - 1);
+            }
+            // Clear visible input after short delay
+            setTimeout(() => setVisibleInputValue(''), 300);
+            setInputValue(value);
             return;
         }
 
-        // Only accept single characters
-        if (e.key.length === 1) {
-            const newTypedText = typedText + e.key;
-            setTypedText(newTypedText);
-            setCursorPosition(prev => prev + 1);
-
-            // Check if challenge is completed
-            if (newTypedText.length >= targetText.length) {
-                const correctChars = newTypedText
-                    .split('')
-                    .filter((char, idx) => idx < targetText.length && char === targetText[idx])
-                    .length;
-
-                const finalAccuracy = Math.round((correctChars / targetText.length) * 100);
-                setAccuracy(finalAccuracy);
-                setStatus("completed");
-                setTimerActive(false);
-            }
-        }
-    };
-
-    // Calculate character classes for text display
-    const getCharClass = (char: any, idx: any) => {
-        const baseClass = "relative transition-all duration-150";
-
-        if (idx >= typedText.length) {
-            return `${baseClass} text-gray-400`;
+        // Check if the character typed matches
+        const lastLetter = value.charAt(value.length - 1);
+        if (lastLetter === currentString.charAt(index)) {
+            setIndex(index + 1);
+        } else {
+            // Track mistakes for accuracy calculation
+            setMistakes(mistakes + 1);
+            const totalAttempts = index + mistakes + 1;
+            const newAccuracy = Math.round((index / totalAttempts) * 100);
+            setAccuracy(newAccuracy);
         }
 
-        return typedText[idx] === char
-            ? `${baseClass} text-gray-900 font-medium`
-            : `${baseClass} text-red-500 bg-red-50 rounded`;
+        setInputValue(value);
+
+        // Clear visible input after short delay
+        setTimeout(() => setVisibleInputValue(''), 300);
     };
 
-    // Calculate accuracy in real-time
-    const calculateCurrentAccuracy = () => {
-        if (typedText.length === 0) return 100;
-
-        const correctChars = typedText
-            .split('')
-            .filter((char, idx) => idx < targetText.length && char === targetText[idx])
-            .length;
-
-        return Math.round((correctChars / typedText.length) * 100);
+    const resetExercise = () => {
+        setIndex(0);
+        setInputValue('');
+        setVisibleInputValue('');
+        setCurrentStringIndex(0);
+        setStartTime(null);
+        setWpm(0);
+        setIsComplete(false);
+        setMistakes(0);
+        setAccuracy(100);
+        if (inputRef.current) inputRef.current.focus();
     };
 
-    const currentAccuracy = calculateCurrentAccuracy();
+    // Calculate progress percentage
+    const progress = Math.round((index / currentString.length) * 100);
 
-    // Get progress percentage
-    const progressPercentage = Math.min(100, Math.round((typedText.length / targetText.length) * 100));
+    // Profile picture component with initials
+    const ProfilePicture = () => {
+        const initials = userName.split(' ').map(name => name[0]).join('').toUpperCase();
+
+        return (
+            <div className="relative">
+                <div
+                    className="flex items-center justify-center rounded-full w-12 h-12 text-white font-bold text-lg"
+                    style={{ backgroundColor: userColor }}
+                >
+                    {initials}
+                </div>
+                {index >= 3 && (
+                    <div className="absolute right-0 bottom-0 bg-green-500 rounded-full w-4 h-4 border-2 border-white"></div>
+                )}
+            </div>
+        );
+    };
 
     return (
-        <div className="min-h-screen bg-gray-50 py-8">
-            <div className="max-w-4xl mx-auto px-4 flex">
-                {/* Main typing area */}
-                <div className="flex-1 mr-4">
-                    <div className="flex justify-between items-center mb-4">
-                        <h1 className="text-xl font-bold">SpeedType</h1>
-                        <div className="bg-indigo-100 px-3 py-1 rounded-full text-sm font-medium text-indigo-800">
-                            Room: {code}
+        <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-6">
+            <div className="w-full max-w-2xl bg-white rounded-lg shadow-lg p-8">
+                {/* Header with profile */}
+                <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-200">
+                    <div className="flex items-center">
+                        <ProfilePicture />
+                        <div className="ml-3">
+                            <h2 className="font-bold text-lg">{userName}</h2>
+                            <p className="text-gray-500 text-sm">Practicing makes perfect</p>
                         </div>
                     </div>
+                    <div className="flex items-center space-x-4">
+                        <div className="flex flex-col items-center">
+                            <div className="flex items-center text-amber-500">
+                                <Trophy size={20} className="mr-1" />
+                                <span className="font-bold">{accuracy}%</span>
+                            </div>
+                            <span className="text-xs text-gray-500">Accuracy</span>
+                        </div>
+                        <div className="flex flex-col items-center">
+                            <div className="flex items-center text-blue-500">
+                                <Clock size={20} className="mr-1" />
+                                <span className="font-bold">{wpm}</span>
+                            </div>
+                            <span className="text-xs text-gray-500">WPM</span>
+                        </div>
+                    </div>
+                </div>
 
-                    <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-                        {/* Stats area */}
-                        <div className="bg-gray-50 p-4 border-b flex justify-between items-center">
-                            <div className="flex space-x-4">
-                                <div className="text-sm">
-                                    WPM: <span className="font-bold text-blue-600">{wpm}</span>
-                                </div>
-                                <div className="text-sm">
-                                    Accuracy: <span className={`font-bold ${currentAccuracy > 90 ? 'text-green-500' :
-                                        currentAccuracy > 70 ? 'text-yellow-500' : 'text-red-500'
-                                        }`}>{currentAccuracy}%</span>
-                                </div>
+                {/* Typing challenge area */}
+                {!isComplete ? (
+                    <>
+                        <div className="text-center mb-8">
+                            <div className="text-2xl font-mono bg-gray-50 p-4 rounded-lg select-none leading-loose">
+                                {currentString.split('').map((char, i) => {
+                                    let className = "text-gray-400";
+                                    if (i < index) className = "text-green-500 font-bold";
+                                    if (i === index) className = "text-blue-500 bg-blue-100 px-1 rounded";
+                                    return (
+                                        <span key={i} className={className}>
+                                            {char === " " ? "\u00A0" : char}
+                                        </span>
+                                    );
+                                })}
                             </div>
                         </div>
 
                         {/* Progress bar */}
-                        <div className="relative h-1 w-full bg-gray-100">
-                            <motion.div
-                                className="absolute top-0 left-0 h-full bg-blue-500"
-                                initial={{ width: "0%" }}
-                                animate={{ width: `${progressPercentage}%` }}
-                                transition={{ type: "spring", stiffness: 100, damping: 15 }}
-                            ></motion.div>
+                        <div className="w-full bg-gray-200 rounded-full h-2.5 mb-6">
+                            <div
+                                className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
+                                style={{ width: `${progress}%` }}
+                            ></div>
                         </div>
 
-                        {/* Typing area */}
-                        <div
-                            ref={containerRef}
-                            tabIndex={0}
-                            onKeyDown={handleKeyDown}
-                            className="p-6 font-mono text-xl focus:outline-none cursor-text min-h-32 flex flex-col justify-center"
+                        {/* Input field */}
+                        <div className="flex items-center">
+                            <input
+                                ref={inputRef}
+                                type="text"
+                                className="w-full border-2 border-gray-300 rounded-lg p-4 text-center text-xl font-mono focus:outline-none focus:border-blue-500"
+                                placeholder="Type here..."
+                                value={visibleInputValue}
+                                onChange={handleChange}
+                                autoFocus
+                            />
+                        </div>
+
+                        {/* Stats */}
+                        <div className="mt-6 flex justify-between text-sm text-gray-500">
+                            <div>String: {currentStringIndex + 1}/{strings.length}</div>
+                            <div>Characters: {index}/{currentString.length}</div>
+                        </div>
+                    </>
+                ) : (
+                    // Completion screen
+                    <div className="flex flex-col items-center py-10">
+                        <div className="text-6xl mb-4">🎉</div>
+                        <h2 className="text-2xl font-bold mb-2">Well done!</h2>
+                        <p className="text-gray-600 mb-6">You've completed all typing challenges</p>
+
+                        <div className="grid grid-cols-2 gap-6 mb-8 w-full max-w-xs">
+                            <div className="bg-blue-50 p-4 rounded-lg text-center">
+                                <div className="text-3xl font-bold text-blue-600">{wpm}</div>
+                                <div className="text-sm text-gray-500">WPM</div>
+                            </div>
+                            <div className="bg-green-50 p-4 rounded-lg text-center">
+                                <div className="text-3xl font-bold text-green-600">{accuracy}%</div>
+                                <div className="text-sm text-gray-500">Accuracy</div>
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={resetExercise}
+                            className="flex items-center bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg transition-colors"
                         >
-                            {/* Typing text */}
-                            <div className="mb-4 leading-relaxed tracking-wide">
-                                {targetText.split("").map((char, idx) => (
-                                    <span
-                                        key={idx}
-                                        className={getCharClass(char, idx)}
-                                    >
-                                        {char}
-                                        {idx === cursorPosition && (
-                                            <>
-                                                <motion.span
-                                                    className={`absolute -right-px top-0 inline-block w-0.5 h-8 bg-blue-500 ml-0.5 ${isBlinking ? 'opacity-100' : 'opacity-0'}`}
-                                                    animate={{ height: [28, 32, 28] }}
-                                                    transition={{ repeat: Infinity, duration: 1.5 }}
-                                                ></motion.span>
-
-                                                {/* Typing indicator with avatar */}
-                                                <motion.div
-                                                    className="absolute -top-8 -left-2"
-                                                    initial={{ y: 5, opacity: 0 }}
-                                                    animate={{ y: 0, opacity: 1 }}
-                                                >
-                                                    <div className="bg-blue-500 h-6 w-6 rounded-full flex items-center justify-center text-white text-xs font-bold">
-                                                        Y
-                                                    </div>
-                                                </motion.div>
-                                            </>
-                                        )}
-                                    </span>
-                                ))}
-                                {cursorPosition >= targetText.length && (
-                                    <motion.span
-                                        className={`inline-block w-0.5 h-8 bg-blue-500 ml-0.5 ${isBlinking ? 'opacity-100' : 'opacity-0'}`}
-                                        animate={{ height: [28, 32, 28] }}
-                                        transition={{ repeat: Infinity, duration: 1.5 }}
-                                    ></motion.span>
-                                )}
-                            </div>
-
-                            {/* Status message */}
-                            <div className="text-sm text-gray-500 italic">
-                                {status === "waiting" && "Click here and start typing..."}
-                                {status === "typing" && "Keep going..."}
-                                {status === "completed" && (
-                                    <button
-                                        onClick={resetGame}
-                                        className="px-3 py-1 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition text-sm"
-                                    >
-                                        Try Again
-                                    </button>
-                                )}
-                            </div>
-                        </div>
+                            <RotateCw size={18} className="mr-2" />
+                            Try Again
+                        </button>
                     </div>
-                </div>
-
-                {/* Participants panel */}
-                <div className="w-64">
-                    <div className="bg-white rounded-xl shadow-lg p-4">
-                        <h3 className="font-medium text-gray-900 mb-3 border-b pb-2">Participants</h3>
-                        <div className="space-y-3">
-                            {participants.map(participant => (
-                                <Avatar
-                                    key={participant.id}
-                                    name={participant.name}
-                                    active={participant.active}
-                                />
-                            ))}
-
-                            {/* Empty state */}
-                            {participants.length === 1 && (
-                                <div className="text-sm text-gray-500 mt-2 italic">
-                                    Waiting for others to join...
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
+                )}
             </div>
         </div>
     );
 };
 
-export default TypeGame;
+export default CodeSubPage;
